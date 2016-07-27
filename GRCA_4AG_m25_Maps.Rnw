@@ -1,0 +1,109 @@
+\documentclass{article}
+\usepackage{pdflscape}
+\usepackage{longtable}
+\usepackage{parskip}
+
+\title{GeoLocators for Gray Catbird (\textsc{GRCA}) transmitter \textsc{4AG} from Warner Park}
+\author{Max A Henschell}
+\begin{document}
+%\SweaveOpts{concordance=TRUE}
+% \SweaveOpts{concordance=TRUE}
+% % \SweaveOpts{concordance=TRUE}
+% \SweaveOpts{width=10, height = 8}
+
+\maketitle
+
+
+\newpage
+% Figure ~\ref{fig:MJPCorr} shows the correlation between measured variables for the \textsc{MJP} portion of the study.\\
+% Figure ~\ref{fig:MAHCorr} shows the correlation between measured variables for the \textsc{MAH} portion of the study.\\
+
+
+%Correlation plots for individual studies are presented first, followed by the results of individual and combined Bayesian model averaging (\textsc{BMA}).
+
+<<include=FALSE, echo=FALSE, results='hide'>>=
+packages.list<-c("GeoLight", "ks", "raster", "RColorBrewer", "ggmap")
+required.packages <- packages.list
+new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, repos = "http://cran.rstudio.com/")
+lapply(packages.list, require, character.only=T)
+
+
+trans_4AG <- gleTrans("4AG_m25.gle")
+sites_4AG <- changeLight(trans_4AG, days = 8)
+elev_4AG <- getElevation(trans_4AG[sites_4AG$site == 1, ], known.coord = c(-89.366667, 43.116667))
+elev_4AG <- -4.5
+positions_4AG <- coord(trans_4AG, degElevation = elev_4AG)
+dat_4AG <- positions_4AG
+dat_4AG <- cbind(dat_4AG,sites_4AG$site)
+colnames(dat_4AG)[3] <- "sites"
+trans_4AG$sites <- sites_4AG$site
+
+#remove observations with flight greater that 'distance' km/units
+filter_4AG <- distanceFilter(trans_4AG, degElevation = elev_4AG, distance = 10, units = "hour")
+SitesFiltered_4AG <- dat_4AG[filter_4AG %in% TRUE, ]
+
+#Remove extralimital locations
+CleanedSites_4AG <- SitesFiltered_4AG[which(SitesFiltered_4AG[,2] > 0 & SitesFiltered_4AG[,2] < 45), ] 
+
+#Breeding sites
+breeding_4AG <- data.frame(CleanedSites_4AG[CleanedSites_4AG[,3] == 1,c(1,2)])
+
+# Bwidth<-Hlscv(breeding_4AG)
+# Breeding_KDE<-raster(kde(x=breeding_4AG,H=Bwidth))
+
+# NB_4AG<-data.frame(lon = positions_4AG[sites_4AG$site== 1,1],lat = positions_4AG[sites_4AG$site== 1,2])
+# NBwidth<-Hlscv(NB_4AG)
+# NBreeding_KDE<-raster(kde(x=NB_4AG,H=Bwidth))
+
+map <- get_map(location = 'America', zoom = 4)
+mapPoints <- ggmap(map) +
+     geom_point(aes(x = lon, y = lat, color = factor(CleanedSites_4AG[,3])), data = data.frame(CleanedSites_4AG), alpha = .5, na.rm=TRUE)
+@
+
+\begin{figure}[!htbp]
+<<message=FALSE, echo=FALSE, results='hide'>>=
+tripMap(SitesFiltered_4AG, xlim = c(-100,-60), map.range = "America")
+@
+\caption{Trip map from \texttt{GeoLight} transmitter \textsc{4AG}.}
+%\textcolor{red}{Red} indicates a negative association with nest success, \textcolor{blue}{blue} indicates positive.}
+\label{fig:4AGTripMap}
+\end{figure}
+
+\begin{figure}[!htbp]
+<<message=FALSE,echo=FALSE, results='hide'>>=
+tripMap(CleanedSites_4AG, xlim = c(-100,-60), map.range = "America")
+@
+\caption{Trip map from \texttt{GeoLight} transmitter \textsc{4AG}, with extralimital locations removed.}
+%\textcolor{red}{Red} indicates a negative association with nest success, \textcolor{blue}{blue} indicates positive.}
+\label{fig:4AGTripMap}
+\end{figure}
+
+\begin{figure}[!htbp]
+<<message=FALSE,echo=FALSE, results='hide'>>=
+mapPoints + scale_colour_discrete(name = "sites", breaks = CleanedSites_4AG[,3])
+@
+\caption{Trip map from \texttt{GeoLight} transmitter \textsc{4AG}, with extralimital locations removed.}
+%\textcolor{red}{Red} indicates a negative association with nest success, \textcolor{blue}{blue} indicates positive.}
+\label{fig:4AGSiteMap}
+\end{figure}
+
+\begin{figure}[!htbp]
+<<message=FALSE,echo=FALSE, results='hide'>>=
+mapBreeding <- get_map(location = c(-89, 43), zoom = 6)
+ggmap(mapBreeding)+ 
+  geom_density2d(data = breeding_4AG, aes(x = lon, y = lat), size = 0.3, na.rm=TRUE) + 
+  stat_density2d(data = breeding_4AG, 
+                 aes(x = lon, y = lat, fill = ..level.., alpha = ..level..), size = 0.01, 
+                 bins = 8, geom = "polygon", na.rm=TRUE) + scale_fill_gradient(low = "green", high = "red") + 
+  scale_alpha(range = c(0, 0.3), guide = FALSE) + 
+  geom_point(aes(x = lon, y = lat), data = breeding_4AG, alpha = .5,na.rm=TRUE)
+@
+\caption{Kernel density estimate of the breeding area for \textsc{4AG}.}
+%\textcolor{red}{Red} indicates a negative association with nest success, \textcolor{blue}{blue} indicates positive.}
+\label{fig:4AGBreedingRange}
+\end{figure}
+
+
+
+\end{document}
